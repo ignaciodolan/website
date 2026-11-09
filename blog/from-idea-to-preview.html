@@ -1,0 +1,57 @@
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="canonical" href="https://ignaciodolan.com/blog/from-idea-to-preview.html" />
+  <title>From Idea to Preview — RadicalRoots</title>
+  <link rel="icon" href="../assets/images/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet" />
+  <link href="../assets/index.css" rel="stylesheet" />
+</head>
+
+<body>
+  <main class="blog-page">
+    <article>
+      <a href="/blog/" class="link back-link">← RadicalRoots</a>
+      <h1>From Idea to Preview: A Simpler Way to Update a Landing Page</h1>
+      <time datetime="2026-04-12">Apr 12, 2026</time>
+
+      <p>Website updates stall because the path from idea to implementation is slow, unclear, or depends on too many people being free at the same time. The idea is rarely the problem.</p>
+      <p>We wanted a simpler workflow for landing page updates: write the request in plain language, let an agent prepare the change, generate a pull request, and review the result in a preview deployment before anything goes live.</p>
+      <p>The system we built is intentionally simple:</p>
+
+      <ol>
+        <li>
+          <p><strong>A request starts in Notion.</strong> A marketer or founder writes a task describing the change. This can be a copy update, a small layout adjustment, or a request to improve a section of the page.</p>
+        </li>
+        <li>
+          <p><strong>The agent reads the request and works in the codebase.</strong> Instead of editing production directly, the agent clones the landing page repository, applies the requested change, and prepares the result like a normal engineering workflow.</p>
+        </li>
+        <li>
+          <p><strong>A pull request is created automatically.</strong> Every change becomes a branch and a PR. Every change stays reviewable, and nothing gets edited behind anyone's back.</p>
+        </li>
+        <li>
+          <p><strong>A preview deployment becomes the review layer.</strong> Once the PR is open, a preview deployment is generated. Non-technical stakeholders can review the exact visual result without GitHub access or a local development environment.</p>
+        </li>
+        <li>
+          <p><strong>A human decides whether the change is good enough to merge.</strong> The workflow is fast, but the final decision stays with a person.</p>
+        </li>
+      </ol>
+
+      <p>The agent does not start from a blank slate. It follows local instructions, brand rules, tone guidelines, and design constraints stored with the codebase, so the output is consistent and close to how a team member would work.</p>
+      <p>The infrastructure is small. An always-on server or container that can reach Notion, GitHub, and the coding agent is enough. The guardrails do the real work: version control, previews, and human review.</p>
+      <p>The result is a better content workflow for marketing sites:</p>
+      <ul>
+        <li>ideas can be expressed in plain language</li>
+        <li>implementation does not block on a developer being immediately available</li>
+        <li>every change remains reviewable</li>
+        <li>nothing reaches production without approval</li>
+      </ul>
+      <p>For a small team, website updates stop being an interruption and become a repeatable system.</p>
+    </article>
+  </main>
+</body>
+
+</html>

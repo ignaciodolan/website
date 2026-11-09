@@ -1,0 +1,93 @@
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="canonical" href="https://ignaciodolan.com/blog/brain-dump-v2.html" />
+  <title>Building a voice-to-Obsidian pipeline that actually understands you — RadicalRoots</title>
+  <link rel="icon" href="../assets/images/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet" />
+  <link href="../assets/index.css" rel="stylesheet" />
+</head>
+
+<body>
+  <main class="blog-page">
+    <article>
+      <a href="/blog/" class="link back-link">← RadicalRoots</a>
+      <h1>Building a voice-to-Obsidian pipeline that actually understands you</h1>
+      <time datetime="2026-01-09">Jan 9, 2026</time>
+
+      <h2>The v1 recap</h2>
+      <p>A few weeks ago I built a system to turn voice memos into structured Obsidian notes automatically. The flow: record a voice memo on iPhone → share it via Shortcuts → Tailscale sends it to a Flask server running on my Mac → Whisper transcribes it → GPT-4o-mini organises it into sections → the note lands in Obsidian.</p>
+      <p>It worked. But after using it daily, four problems became obvious.</p>
+
+      <h2>Problem 1: Whisper doesn't know my vocabulary</h2>
+      <p>Whisper is impressive, but it has no idea that I run a local restaurant called Guarango, or that I work with a company called Big Fidelity, or that I use Tailscale and Embat daily. So the transcripts would come out like this:</p>
+      <blockquote><p><em>"I was talking to Tashforce about the lack integration at Big Filiety…"</em></p></blockquote>
+      <p>Which should have been:</p>
+      <blockquote><p><em>"I was talking to Task Force about the Slack integration at Big Fidelity…"</em></p></blockquote>
+      <p>Every wrong word meant lost context when GPT tried to make sense of it.</p>
+      <h3>The fix: a living vocabulary note in Obsidian</h3>
+      <p>Whisper has an <code>initial_prompt</code> parameter that primes the model with context before it starts. Instead of hardcoding a list in a config file, I created a note at <code>Brain dump/Vocabulary.md</code> inside my Obsidian vault. The pipeline reads it on every run and passes the contents as <code>initial_prompt</code>. To add a new word I just open Obsidian, edit that note, and the next recording picks it up. No code changes, no redeploy.</p>
+
+      <h2>Problem 2: too many todos</h2>
+      <p>The original GPT prompt said: <em>"extrae tareas concretas y accionables mencionadas o implícitas en el audio."</em></p>
+      <p>The word <strong>implícitas</strong> was doing a lot of damage. GPT was turning every idea, observation, and passing thought into a <code>- [ ]</code> checkbox. A brain dump would end up with 12 todos, half of which were things I was just thinking out loud about, not commitments.</p>
+      <h3>The fix: explicit intent verbs only</h3>
+      <p>The new instruction is strict: only things I explicitly committed to become todos: phrases like <em>"tengo que"</em>, <em>"necesito"</em>, <em>"voy a"</em>, <em>"hay que"</em>. Everything else goes into <strong>Ideas</strong> or <strong>Oportunidades</strong> where it belongs.</p>
+
+      <h2>Problem 3: no way to debug transcription issues</h2>
+      <p>When the note came out wrong, there was no way to know if the problem was the transcription or the GPT structuring. The raw Whisper output was thrown away after processing.</p>
+      <h3>The fix: transcript at the bottom</h3>
+      <p>Every brain dump note now ends with a <code>## Transcript</code> section containing the raw Whisper output verbatim. If something looks off in the structured note, I scroll down and see exactly what Whisper heard. Correct transcript + wrong structure = prompt issue. Garbled transcript = add the word to <code>Vocabulary.md</code>.</p>
+      <h3>What the note looks like now</h3>
+      <pre><code># Brain Dump - 2026-01-09
+
+## Estado emocional
+enfocado
+
+## Prioridad del día
+Definir integración de Slack con Big Fidelity
+
+## Ideas
+- Explorar dashboards para Guarango
+
+## Todos
+- [ ] Llamar a Task Force sobre la integración
+- [ ] Revisar métricas de Embat esta semana
+
+## Transcript
+Hoy hablé con Task Force sobre la integración de Slack con Big Fidelity...</code></pre>
+
+      <h2>Problem 4: tweaking the prompt required a code change</h2>
+      <p>Every time GPT structured something wrong (wrong tone, wrong section, missing nuance), fixing it meant editing <code>structure.py</code>, restarting the server, and hoping the change worked. That feedback loop was too slow for something you use every day.</p>
+      <h3>The fix: prompt lives in Obsidian</h3>
+      <p>The GPT system prompt now lives at <code>Brain dump/Prompt.md</code> in the vault. The pipeline reads it on every run, same as <code>Vocabulary.md</code>. Open the note, change a line, save. The next recording uses it immediately.</p>
+      <p>The hardcoded prompt in code stays as a fallback. If <code>Prompt.md</code> doesn't exist, it still works. If it does exist, Obsidian wins.</p>
+      <p>The full set of live-editable config is now:</p>
+      <table>
+        <thead>
+          <tr><th>Note</th><th>Controls</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Brain dump/Vocabulary.md</code></td><td>Words Whisper should recognise correctly</td></tr>
+          <tr><td><code>Brain dump/Prompt.md</code></td><td>How GPT structures and interprets the transcript</td></tr>
+        </tbody>
+      </table>
+      <p>No code changes needed for either. The pipeline just reads them on every run.</p>
+
+      <h2>What's next</h2>
+      <ul>
+        <li><strong>Smarter pending todos.</strong> Age out unchecked todos after a few days instead of carrying them forward indefinitely</li>
+        <li><strong>Weekly digest.</strong> A Sunday note that summarises the week's ideas and patterns across all daily dumps</li>
+        <li><strong>Language detection.</strong> I sometimes mix Spanish and English mid-sentence. Telling GPT that explicitly should help it handle both</li>
+      </ul>
+
+      <hr>
+      <p><em>Built with Python, Whisper, GPT-4o-mini, Flask, Tailscale, and Obsidian CLI.</em></p>
+    </article>
+  </main>
+</body>
+
+</html>

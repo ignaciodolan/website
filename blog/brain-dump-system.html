@@ -1,0 +1,95 @@
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="canonical" href="https://ignaciodolan.com/blog/brain-dump-system.html" />
+  <title>Brain Dump as a service — RadicalRoots</title>
+  <link rel="icon" href="../assets/images/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet" />
+  <link href="../assets/index.css" rel="stylesheet" />
+</head>
+
+<body>
+  <main class="blog-page">
+    <article>
+      <a href="/blog/" class="link back-link">← RadicalRoots</a>
+      <h1>Brain Dump as a service</h1>
+      <time datetime="2025-12-12">Dec 12, 2025</time>
+
+      <p>Hace tiempo que quería un sistema para capturar todo lo que tengo en la cabeza sin fricciones. Quería hablar en vez de escribir, y que lo que dijera apareciera estructurado en Obsidian sin que yo tuviera que hacer nada más.</p>
+      <p>Esto es lo que construí.</p>
+
+      <h2>El problema</h2>
+      <p>Tengo ideas, problemas, tareas y conexiones dando vueltas todo el tiempo. Si no las capturo en el momento, se pierden. Abrir una app y escribir tiene suficiente fricción como para que no lo haga con constancia. Lo que sí hago naturalmente es hablar.</p>
+
+      <h2>La solución</h2>
+      <p>Un pipeline completamente automatizado:</p>
+      <ol>
+        <li>Grabo un audio en Voice Memos desde el iPhone. Hablo libremente, sin estructura</li>
+        <li>Comparto el audio con un Shortcut llamado "Brain Dump"</li>
+        <li>El Shortcut envía el archivo a mi Mac vía Tailscale (red privada)</li>
+        <li>Un servidor Flask recibe el audio y lo procesa en background</li>
+        <li>Whisper (local, sin costo) transcribe el audio</li>
+        <li>GPT-4o-mini estructura el texto en secciones</li>
+        <li>La nota aparece automáticamente en Obsidian bajo <code>Brain dump/YYYY-MM-DD.md</code></li>
+      </ol>
+      <p>Todo el proceso tarda ~2-3 minutos. Yo no tengo que hacer nada más que hablar y tocar "compartir".</p>
+
+      <h2>El formato de la nota</h2>
+      <p>Cada brain dump genera una nota con 8 secciones:</p>
+      <pre><code># Brain Dump - 2025-12-12
+
+## Estado emocional
+agotado
+
+## Prioridad del día
+La tarea más urgente e importante del día.
+
+## Ideas
+- ...
+
+## Problemas
+- ...
+
+## Reflexión
+Análisis de patrones y causas raíz de los problemas mencionados.
+
+## Oportunidades
+- ...
+
+## Todos
+- [ ] Tarea concreta extraída del audio
+- [ ] Tarea pendiente del día anterior (carryover automático)
+
+## Conexiones
+- [[tema-a]] ↔ [[tema-b]]</code></pre>
+      <p>Lo que más me gusta es que los todos sin completar del día anterior se cargan automáticamente como contexto, así GPT puede incluirlos si siguen siendo relevantes. Nada se pierde entre días.</p>
+
+      <h2>La arquitectura técnica</h2>
+      <pre><code>iPhone (Voice Memos)
+  → Share Sheet → Shortcut "Brain Dump"
+  → POST http://&lt;tailscale-ip&gt;:9421/upload
+  → Flask server (Mac, siempre corriendo via Launch Agent)
+  → Whisper local (transcripción)
+  → OpenAI GPT-4o-mini (estructuración)
+  → obsidian CLI
+  → Brain dump/YYYY-MM-DD.md</code></pre>
+      <p><strong>Stack:</strong> Python + Flask, <code>openai-whisper</code> para transcripción local, OpenAI API (<code>gpt-4o-mini</code>), Tailscale, macOS Launch Agent, Obsidian CLI.</p>
+
+      <h2>Lo que aprendí en el camino</h2>
+      <p>Algunos problemas no obvios que tuve que resolver:</p>
+      <ul>
+        <li><strong>El obsidian CLI devuelve exit code 0 incluso en errores.</strong> Tuve que detectar errores leyendo el stdout en vez del código de salida</li>
+        <li><strong>Los Launch Agents no tienen el PATH completo.</strong> <code>ffmpeg</code> y el CLI de Obsidian no se encontraban, así que tuve que hardcodear las rutas en el subprocess</li>
+        <li><strong>Los Shortcuts de iPhone no aceptan <code>name=</code> con <code>/</code>.</strong> Tuve que usar <code>path=</code> para crear notas en subcarpetas</li>
+      </ul>
+
+      <h2>Resultado</h2>
+      <p>Cada mañana (o cuando lo necesito) grabo un audio de 2-5 minutos hablando de lo que tengo en la cabeza. Sin estructura, sin formato, sin pensar en cómo escribirlo. Tres minutos después tengo una nota estructurada en Obsidian con mis ideas clasificadas, una reflexión sobre los problemas, mis tareas del día, y los pendientes de ayer.</p>
+    </article>
+  </main>
+</body>
+
+</html>

@@ -1,0 +1,96 @@
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="canonical" href="https://ignaciodolan.com/blog/building-an-agent-notion.html" />
+  <title>Building an Agent That Takes Orders from Notion — RadicalRoots</title>
+  <link rel="icon" href="../assets/images/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet" />
+  <link href="../assets/index.css" rel="stylesheet" />
+</head>
+
+<body>
+  <main class="blog-page">
+    <article>
+      <a href="/blog/" class="link back-link">← RadicalRoots</a>
+      <h1>Building an Agent That Takes Orders from Notion</h1>
+      <time datetime="2026-03-14">Mar 14, 2026</time>
+
+      <p>Been working on a friend's website, and as always, we wanted a simple loop: put a task on a board, have an AI agent pick it up, do the work, and report back. Just a poller, a dispatcher, and Claude.</p>
+
+      <h2>The Setup</h2>
+      <p>The whole thing is a Node.js process that polls a Notion database every 30 seconds. When it finds a card with status "Assigned to Agent", it picks it up and hands it to a coding agent, which is really just a wrapper around <code>claude --print</code> pointed at a local directory.</p>
+      <figure class="diagram">
+        <svg viewBox="0 0 560 440" role="img" aria-labelledby="loop-title" style="width:100%;max-width:560px;height:auto;display:block;margin:0 auto;font-family:'Source Sans Pro',Helvetica,Arial,sans-serif">
+          <title id="loop-title">Notion card flows into a local Node.js process (poller, dispatcher, coding agent) and back to Notion as Done or Failed</title>
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="#555"/>
+            </marker>
+          </defs>
+          <!-- Notion card (in) -->
+          <rect x="150" y="12" width="260" height="52" rx="6" fill="#fff" stroke="#bbb"/>
+          <text x="280" y="33" text-anchor="middle" font-size="15" font-weight="600" fill="#222">Notion card</text>
+          <text x="280" y="52" text-anchor="middle" font-size="13" fill="#666">status: Assigned to Agent</text>
+          <!-- poll arrow -->
+          <line x1="280" y1="64" x2="280" y2="106" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="292" y="90" font-size="13" fill="#666">poll every 30s</text>
+          <!-- process container -->
+          <rect x="60" y="110" width="440" height="236" rx="8" fill="#e8e8e8"/>
+          <text x="76" y="132" font-size="13" font-weight="600" fill="#555" letter-spacing="0.5">LOCAL NODE.JS PROCESS</text>
+          <!-- Poller -->
+          <rect x="160" y="146" width="240" height="40" rx="6" fill="#fff" stroke="#bbb"/>
+          <text x="280" y="171" text-anchor="middle" font-size="15" fill="#222">Poller</text>
+          <line x1="280" y1="186" x2="280" y2="208" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Dispatcher -->
+          <rect x="160" y="210" width="240" height="40" rx="6" fill="#fff" stroke="#bbb"/>
+          <text x="280" y="235" text-anchor="middle" font-size="15" fill="#222">Dispatcher</text>
+          <line x1="280" y1="250" x2="280" y2="272" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+          <!-- Coding agent -->
+          <rect x="160" y="274" width="240" height="52" rx="6" fill="#fff" stroke="#bbb"/>
+          <text x="280" y="295" text-anchor="middle" font-size="15" fill="#222">Coding agent</text>
+          <text x="280" y="314" text-anchor="middle" font-size="13" font-family="monospace" fill="#666">claude --print</text>
+          <!-- out arrow -->
+          <line x1="280" y1="326" x2="280" y2="378" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="292" y="366" font-size="13" fill="#666">stdout or error</text>
+          <!-- Notion card (out) -->
+          <rect x="150" y="380" width="260" height="52" rx="6" fill="#fff" stroke="#bbb"/>
+          <text x="280" y="401" text-anchor="middle" font-size="15" font-weight="600" fill="#222">Notion card</text>
+          <text x="280" y="420" text-anchor="middle" font-size="13" fill="#666">status: Done or Failed</text>
+          <!-- loop back -->
+          <path d="M410 406 H536 V38 H412" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+          <text x="548" y="226" text-anchor="middle" font-size="12" fill="#888" transform="rotate(90 548 226)">next card</text>
+        </svg>
+      </figure>
+      <p>The entire system is about 200 lines across a handful of files.</p>
+
+      <h2>How It Works</h2>
+      <p>Config loads environment variables: a Notion token, a database ID, and a path to the local repo. The poller queries Notion for assigned tasks and keeps a <code>Set</code> of in-flight page IDs so it doesn't double-dispatch.</p>
+      <p>The dispatcher routes tasks to agents (we only have one: coding) with a concurrency limit via <code>p-limit</code>. The coding agent builds a prompt from the card's name and description, spawns <code>claude --print --dangerously-skip-permissions</code>, waits up to 10 minutes, and captures stdout.</p>
+      <p>When Claude finishes, the Notion card moves to "Done" with the output, or "Failed" with the error. That's the entire lifecycle.</p>
+
+      <h2>Why This Shape</h2>
+      <p>We considered a few alternatives early on:</p>
+      <ul>
+        <li><strong>Webhooks from Notion.</strong> Notion doesn't support them natively, and third-party bridges add a dependency we didn't want. Polling every 30 seconds is simple and good enough.</li>
+        <li><strong>A queue (SQS, Redis).</strong> Overkill when the source of truth is already a database we're querying. The poller is the consumer.</li>
+        <li><strong>Agent frameworks (LangChain, CrewAI).</strong> We don't need tool orchestration or memory or multi-step planning at the orchestrator level. Claude Code already handles all of that internally. We just need to point it at a directory and give it a task.</li>
+      </ul>
+      <p>The <code>--print</code> flag is key. It runs Claude in a single-shot mode: no interactive session, no TUI. It reads the prompt, does its work (reading files, writing files, running commands), and prints a summary. From the orchestrator's perspective, it's a subprocess with stdin/stdout.</p>
+
+      <h2>What We Learned</h2>
+      <p><strong>Concurrency matters immediately.</strong> Even with two slots, you have to track in-flight tasks or the poller will keep dispatching the same card every 30 seconds. The <code>inFlight</code> Set was one of the first things we added.</p>
+      <p><strong>Timeouts are non-negotiable.</strong> Claude can get stuck in loops. A 10-minute hard kill via SIGTERM keeps the system from hanging indefinitely.</p>
+      <p><strong>Structured logging from day one.</strong> JSON logs with task names and page IDs made debugging straightforward even before we had any monitoring.</p>
+      <p><strong>The card is the contract.</strong> Every field the agent needs (name, description, target directory, agent type) lives on the Notion card. No separate config files, no task definitions in code. Change the card, change the behavior.</p>
+
+      <h2>What's Missing</h2>
+      <p>The obvious gap is that this only works locally. Claude runs against whatever's on disk, and there's no version control in the loop. No branch, no PR, no review step. The agent makes changes directly to your working tree, which is fine for experimentation but not something you'd point at production code.</p>
+      <p>The next step is clear: clone a fresh copy, branch, commit, push, open a PR. The polling and dispatch loop doesn't need to change at all. That's the nice thing about keeping the orchestrator thin: the agent is the only part that needs to get smarter.</p>
+    </article>
+  </main>
+</body>
+
+</html>
